@@ -9,12 +9,12 @@ type TransformParams = {
     format: 'jpeg' | 'png' | 'webp';
 };
 
-function normalizeQuery(q:any){
-    const ordered :any = {};
+function normalizeQuery(q: any) {
+    const ordered: any = {};
 
     Object.keys(q)
         .sort()
-        .forEach(k=>{
+        .forEach(k => {
             ordered[k] = q[k]
         });
     return ordered;
@@ -39,11 +39,12 @@ function validateParams(query: any): TransformParams {
     h = step(h, 100);
     q = step(q, 10);
 
-    if (w < 50 || h < 50){
-        w = 800;
-        h = 800;
+    // Reject extreme values instead of auto-fixing
+    if (w < 50 || h < 50) {
+        throw new Error("dimension too small");
     }
-        
+
+
 
     if (w > 3000 || h > 3000)
         throw new Error("dimension too large");
@@ -52,8 +53,10 @@ function validateParams(query: any): TransformParams {
         throw new Error("quality out of range");
 
     const ratio = Math.max(w, h) / Math.min(w, h);
-    if (ratio > 5)
+    if (ratio > 5){
         throw new Error("aspect ratio insane");
+    }
+        
 
     return {
         width: w,
@@ -128,14 +131,14 @@ function buildResponse(buffer: Buffer, format: string) {
 
 // centralized eror handling
 function errorResponse(status: number, msg: string) {
-  return {
-    statusCode: status,
-    headers: {
-      "Content-Type": "application/json"
-    },
-    isBase64Encoded: false,
-    body: JSON.stringify({ error: msg })
-  };
+    return {
+        statusCode: status,
+        headers: {
+            "Content-Type": "application/json"
+        },
+        isBase64Encoded: false,
+        body: JSON.stringify({ error: msg })
+    };
 }
 
 export const handler = async (event: any) => {
@@ -182,26 +185,25 @@ export const handler = async (event: any) => {
         };
 
         //5. return HTTP resources
-        const res =  buildResponse(buffer, params.format);
-        console.log("THIS_MS" ,Date.now() - start);
+        const res = buildResponse(buffer, params.format);
+        console.log("THIS_MS", Date.now() - start);
 
         return res;
-        
+
     } catch (err: any) {
         const msg = err.message || "unknown error";
 
-        if(msg.includes("not found"))
-        {
-            return errorResponse(404,msg);
+        if (msg.includes("not found")) {
+            return errorResponse(404, msg);
         }
 
 
-        if(msg.includes("format") || msg.includes("dimension") || msg.includes("quality")){
-            return errorResponse(400 , msg);
+        if (msg.includes("format") || msg.includes("dimension") || msg.includes("quality")) {
+            return errorResponse(400, msg);
         }
 
 
-        console.log("THIS_MS : " , Date.now() -start);
-        return errorResponse(500,msg);
+        console.log("THIS_MS : ", Date.now() - start);
+        return errorResponse(500, msg);
     }
 };
