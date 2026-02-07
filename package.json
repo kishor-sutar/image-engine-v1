@@ -3,7 +3,8 @@
     "@aws-sdk/client-s3": "^3.984.0",
     "aws-cdk-lib": "^2.237.1",
     "constructs": "^10.4.5",
-    "sharp": "^0.34.5"
+    "sharp": "^0.34.5",
+    "stream-to-buffer": "^0.1.0"
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.160",
