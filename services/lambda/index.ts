@@ -72,6 +72,7 @@ async function transformBuffer(
     input: Buffer,
     params: TransformParams
 ) {
+    
     const meta = await sharp(input).metadata();
 
     const allowedInput = ["jpeg", "png", "webp"];
@@ -91,14 +92,14 @@ async function transformBuffer(
 
 }
 
-async function transformLocal(
-    inputPath: string,
-    params: TransformParams
-) {
-    // Detect real format
-    const input = fs.readFileSync(inputPath);
-    return transformBuffer(input, params);
-}
+// async function transformLocal(
+//     inputPath: string,
+//     params: TransformParams
+// ) {
+//     // Detect real format
+//     const input = fs.readFileSync(inputPath);
+//     return transformBuffer(input, params);
+// }
 
 function buildKey(fileName: string, p: TransformParams) {
 
@@ -141,6 +142,36 @@ function errorResponse(status: number, msg: string) {
     };
 }
 
+async function loadSource(fileName:string):Promise<Buffer>{
+    const localPath = __dirname + "/" +fileName;
+    if(!fs.existsSync(localPath)){
+        throw new Error("Souce image not found locally");
+    }
+
+    return fs.readFileSync(localPath);
+}
+
+async function checkOrsave(
+    fileName:string,
+    params:TransformParams,
+    buffer:Buffer
+){
+    const key = buildKey(fileName,params);
+
+    const outPath = __dirname + "/cached_" + key.replace(/\//g,"_");
+
+    if(fs.existsSync(outPath)){
+        console.log("CACHE HIT: " , outPath);
+        return fs.readFileSync(outPath);
+    }
+
+    fs.writeFileSync(outPath,buffer);
+
+    console.log("SAVED MOCK" ,outPath);
+
+    return buffer;
+    
+}
 export const handler = async (event: any) => {
     const start = Date.now();
     try {
@@ -169,11 +200,14 @@ export const handler = async (event: any) => {
         if (!fs.existsSync(localPath)) {
             throw new Error("source image not found locally");
         }
+        const source = await loadSource(fileName);
+        const buffer = await transformBuffer(source, params);
 
-        const buffer = await transformLocal(
-            localPath,
-            params
-        );
+        // await saveResult(fileName,params,buffer);  oooolld  codde
+        const finalBuffer = await checkOrsave(fileName,params,buffer);
+
+
+
 
 
         //4. content type map
@@ -185,7 +219,7 @@ export const handler = async (event: any) => {
         };
 
         //5. return HTTP resources
-        const res = buildResponse(buffer, params.format);
+        const res = buildResponse(finalBuffer, params.format);
         console.log("THIS_MS", Date.now() - start);
 
         return res;
