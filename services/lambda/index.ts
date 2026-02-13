@@ -1,6 +1,23 @@
 import sharp from "sharp";
 import fs from "fs";
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
+const memoryCache = new Map<
+  string,
+  { buffer: Buffer; expiresAt: number }
+>();
+
+
+type LambdaEvent = {
+    rawPath: string;
+    queryStringParameters?:Record<string, string>;
+};
+
+type LambdaResponse = {
+    statusCode: number;
+    headers: Record<string, string>;
+    isBase64Encoded: boolean;
+    body: string;
+};
 
 type TransformParams = {
     width: number;
@@ -151,28 +168,77 @@ async function loadSource(fileName:string):Promise<Buffer>{
     return fs.readFileSync(localPath);
 }
 
-async function checkOrsave(
-    fileName:string,
-    params:TransformParams,
-    buffer:Buffer
-){
-    const key = buildKey(fileName,params);
+// async function checkOrsave(
+//     fileName:string,
+//     params:TransformParams,
+//     buffer:Buffer
+// ){
+//     const key = buildKey(fileName,params);
 
-    const outPath = __dirname + "/cached_" + key.replace(/\//g,"_");
+//     const outPath = __dirname + "/cached_" + key.replace(/\//g,"_");
 
-    if(fs.existsSync(outPath)){
-        console.log("CACHE HIT: " , outPath);
-        return fs.readFileSync(outPath);
-    }
+//     if(fs.existsSync(outPath)){
+//         console.log("CACHE HIT: " , outPath);
+//         return fs.readFileSync(outPath);
+//     }
 
-    fs.writeFileSync(outPath,buffer);
+//     fs.writeFileSync(outPath,buffer);
 
-    console.log("SAVED MOCK" ,outPath);
+//     console.log("SAVED MOCK" ,outPath);
 
-    return buffer;
+//     return buffer;
     
+// }
+// async function checkOrsave(
+//   fileName: string,
+//   params: TransformParams,
+//   buffer: Buffer
+// ) {
+
+//   const key = buildKey(fileName, params);
+
+//   if (memoryCache.has(key)) {
+//     console.log("CACHE HIT (memory):", key);
+//     return memoryCache.get(key)!;
+//   }
+
+//   memoryCache.set(key, buffer);
+//   console.log("CACHE WRITE (memory):", key);
+
+//   return buffer;
+// }
+
+async function checkOrsave(
+  fileName: string,
+  params: TransformParams,
+  buffer: Buffer
+) {
+
+  const key = buildKey(fileName, params);
+  const now = Date.now();
+  const TTL = 60 * 1000; // 60 seconds
+
+  const cached = memoryCache.get(key);
+
+  if (cached && cached.expiresAt > now) {
+    console.log("CACHE HIT (memory):", key);
+    return cached.buffer;
+  }
+
+  memoryCache.set(key, {
+    buffer,
+    expiresAt: now + TTL
+  });
+
+  console.log("CACHE WRITE (memory):", key);
+
+  return buffer;
 }
-export const handler = async (event: any) => {
+
+
+export const handler = async (
+  event: LambdaEvent
+): Promise<LambdaResponse> => {
     const start = Date.now();
     try {
         //1.extract request info (lambda URL styles)
@@ -182,6 +248,11 @@ export const handler = async (event: any) => {
         //remove leading slash
 
         const fileName = path.replace(/^\//, "").toLowerCase().trim();
+
+
+        if(fileName.includes("..") || fileName.includes("/")){
+            throw new Error("invalid file name");
+        }    
 
         //2.Validate & normalize
 
