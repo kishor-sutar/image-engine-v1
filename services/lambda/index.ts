@@ -6,6 +6,8 @@ const memoryCache = new Map<
   { buffer: Buffer; expiresAt: number }
 >();
 
+const MAX_CACHE_SIZE = 100; // Max number of items in cache - can be tuned based on memory constraints
+
 
 type LambdaEvent = {
     rawPath: string;
