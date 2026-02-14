@@ -5,6 +5,7 @@ import { resolveSoa } from 'node:dns';
 const app = express();
 
 app.get("/:image",async(req,res)=>{
+    const start = Date.now();
     const event = {
         rawPath: "/"+req.params.image,
         queryStringParameters: req.query as any
@@ -14,6 +15,7 @@ app.get("/:image",async(req,res)=>{
     res.status(lambdaRes.statusCode);
 
     if(!lambdaRes.isBase64Encoded){
+        console.log("REQ_TIME_MS:",Date.now()-start);
         return res.send(lambdaRes.body);
     }
 
@@ -21,7 +23,7 @@ app.get("/:image",async(req,res)=>{
     Object.entries(lambdaRes.headers).forEach(([k,v])=>{
         res.setHeader(k,v);
     });
-
+    console.log("REQ_TIME_MS:",Date.now()-start);
     return res.send(buffer);
 });
 
