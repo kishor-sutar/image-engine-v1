@@ -2,6 +2,7 @@ import sharp from "sharp";
 import fs from "fs";
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 
+const fsp = fs.promises;
 interface storageProvider {
     loadSource(fileName: string): Promise<Buffer>;
     getTransformed(key: string): Promise<Buffer | null>;
@@ -28,19 +29,40 @@ const storage = {
         return fs.readFileSync(localPath);
     },
 
-    getFromCache(key: string): Buffer | null {
+
+    async getFromCache(key: string): Promise<Buffer | null> {
 
         const now = Date.now();
-        const cached = this.memoryCache.get(key);
 
+        // 1️ Memory first
+        const cached = this.memoryCache.get(key);
         if (cached && cached.expiresAt > now) {
             console.log("CACHE HIT (memory):", key);
             return cached.buffer;
         }
 
-        return null;
-    },
+        // 2️ Disk async check
+        const diskPath = __dirname + "/transformed/" +
+            key.replace(/\//g, "_");
 
+        try {
+            const buffer = await fsp.readFile(diskPath);
+
+            // Warm memory
+            this.memoryCache.set(key, {
+                buffer,
+                expiresAt: now + this.TTL
+            });
+
+            console.log("CACHE HIT (disk → warmed memory):", key);
+            return buffer;
+
+        } catch {
+            return null; // file not found
+        }
+    }
+
+    ,
     saveToCache(key: string, buffer: Buffer): void {
 
         const now = Date.now();
@@ -266,26 +288,26 @@ async function transformBuffer(
 // }
 
 function buildKey(
-  fileName: string,
-  params: TransformParams
+    fileName: string,
+    params: TransformParams
 ): string {
 
-  const parts = [
-    `fmt=${params.format}`,
-    `q=${params.quality}`
-  ];
+    const parts = [
+        `fmt=${params.format}`,
+        `q=${params.quality}`
+    ];
 
-  if (params.width !== undefined) {
-    parts.push(`w=${params.width}`);
-  }
+    if (params.width !== undefined) {
+        parts.push(`w=${params.width}`);
+    }
 
-  if (params.height !== undefined) {
-    parts.push(`h=${params.height}`);
-  }
+    if (params.height !== undefined) {
+        parts.push(`h=${params.height}`);
+    }
 
-  parts.sort(); // deterministic order
+    parts.sort(); // deterministic order
 
-  return `${fileName}/${parts.join("_")}.${params.format}`;
+    return `${fileName}/${parts.join("_")}.${params.format}`;
 }
 
 
@@ -548,7 +570,7 @@ export const handler = async (
         const key = buildKey(fileName, params);
 
         // 4 Check cache FIRST
-        const cached = storage.getFromCache(key);
+        const cached = await storage.getFromCache(key);
         if (cached) {
             return buildResponse(cached, params.format);
         }
@@ -674,7 +696,7 @@ saveToCache()
 
 Handler stays untouched.
 
-That’s called:
+Thats called:
 
 📌 Dependency Isolation
 
@@ -730,6 +752,6 @@ painful to extend
 
 Now it’s clean.
 
-🧠 In One Sentence
+🧠 In One Sentence    ,   http://localhost:3000/evil_cat_195235.jpg?w=200
 
 You just converted a script into a properly layered service using the cache-aside architectural pattern. */
