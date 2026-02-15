@@ -18,6 +18,8 @@ const storage = {
 
     TTL: 60 * 1000,
     MAX: 100,
+    inFlight: new Map<string, Promise<Buffer>>(),
+
 
     async loadSource(fileName: string): Promise<Buffer> {
         const localPath = __dirname + "/" + fileName;
@@ -254,7 +256,7 @@ async function transformBuffer(
     input: Buffer,
     params: TransformParams
 ) {
-
+    await new Promise(res => setTimeout(res, 3000));
     const meta = await sharp(input).metadata();
 
     const allowedInput = ["jpeg", "png", "webp"];
@@ -575,17 +577,33 @@ export const handler = async (
             return buildResponse(cached, params.format);
         }
 
-        // 5️ Load source
-        const source = await storage.loadSource(fileName);
+        // 1️ Check if transform already running
+        if (storage.inFlight.has(key)) {
+            const buffer = await storage.inFlight.get(key)!;
+            return buildResponse(buffer, params.format);
+        }
 
-        // 6️ Transform
-        const buffer = await transformBuffer(source, params);
+        // 2️ Start transform and register promise
+        const transformPromise = (async () => {
 
-        //7️ Save to cache
-        storage.saveToCache(key, buffer);
+            const source = await storage.loadSource(fileName);
+            const buffer = await transformBuffer(source, params);
 
-        // 8️ Return response
-        return buildResponse(buffer, params.format);
+            await storage.saveToCache(key, buffer);
+
+            return buffer;
+
+        })();
+
+        storage.inFlight.set(key, transformPromise);
+
+        try {
+            const buffer = await transformPromise;
+            return buildResponse(buffer, params.format);
+        } finally {
+            storage.inFlight.delete(key);
+        }
+
 
     } catch (err: any) {
 
