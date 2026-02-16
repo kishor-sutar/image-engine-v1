@@ -4,7 +4,8 @@ import { handler } from "./index";
     console.log("TEST STARTED");
     try {
         const event = {
-            rawPath: "/evil_Cat_195235.jpg",
+          rawPath: "/u/kishor/evil_Cat_195235.jpg",
+
             queryStringParameters: {
                 h: "412",
                 w: "237",

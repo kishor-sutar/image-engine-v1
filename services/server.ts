@@ -1,10 +1,25 @@
 import express, { raw } from 'express';
 import { handler } from './lambda/index';
+import { API_KEYS } from "../config/apiKeys";
+
 import { resolveSoa } from 'node:dns';
 
 const app = express();
+app.use((req, res, next) => {
+  const apiKey = req.header("x-api-key");
 
-app.get("/:image",async(req,res)=>{
+  if (!apiKey || !API_KEYS.has(apiKey)) {
+    return res.status(401).json({ error: "unauthorized" });
+  }
+
+  next();
+});
+
+app.get("/u/:userId/:image",async(req,res)=>{
+
+    const {userId,image} = req.params;
+    req.params.image = image;
+    req.params.userId = userId;
     const start = Date.now();
     const event = {
         rawPath: "/"+req.params.image,

@@ -33,7 +33,9 @@ const cases = [
   {
     name: "insane ratio",
     event: {
-      rawPath: "/evil_cat_195235.jpg",
+      // rawPath: "/evil_cat_195235.jpg",
+      rawPath: "/u/kishor/evil_cat_195235.jpg",
+
       queryStringParameters: { w: "10", h: "2000" }
     }
   }
