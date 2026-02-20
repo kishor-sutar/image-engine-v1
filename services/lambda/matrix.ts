@@ -4,7 +4,7 @@ const cases = [
   {
     name: "normal",
     event: {
-      rawPath: "/evil_cat_195235.jpg",
+      rawPath: "/u/kishor/evil_cat_195235.jpg",
       queryStringParameters: {
         w: "237",
         h: "412",
@@ -17,7 +17,7 @@ const cases = [
   {
     name: "no params (defaults)",
     event: {
-      rawPath: "/evil_cat_195235.jpg",
+      rawPath: "/u/kishor/evil_cat_195235.jpg",
       queryStringParameters: {}
     }
   },
@@ -25,7 +25,7 @@ const cases = [
   {
     name: "bad format",
     event: {
-      rawPath: "/evil_cat_195235.jpg",
+      rawPath: "/u/kishor/evil_cat_195235.jpg",
       queryStringParameters: { fmt: "gif" }
     }
   },
@@ -47,7 +47,7 @@ const cases = [
 
     console.log("\nCASE:", c.name);
 
-    const res = await handler(c.event);
+    const res = await handler(c.event as any);
 
     console.log({
       status: res.statusCode,
